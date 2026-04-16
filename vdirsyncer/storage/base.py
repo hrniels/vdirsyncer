@@ -27,7 +27,7 @@ class StorageMeta(ABCMeta):
     def __init__(cls, name, bases, d):
         """Wrap mutating methods to fail if the storage is readonly."""
 
-        for method in ("update", "upload", "delete", "set_meta"):
+        for method in ("update", "upload", "delete", "delete_collection", "set_meta"):
             setattr(cls, method, mutating_storage_method(getattr(cls, method)))
         return super().__init__(name, bases, d)
 
@@ -217,6 +217,10 @@ class Storage(metaclass=StorageMeta):
         :raises: :exc:`vdirsyncer.exceptions.PreconditionFailed` when item has
             a different etag or doesn't exist.
         """
+        raise NotImplementedError
+
+    async def delete_collection(self):
+        """Delete the current collection and all contained items."""
         raise NotImplementedError
 
     @contextlib.asynccontextmanager

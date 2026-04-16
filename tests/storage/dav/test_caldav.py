@@ -175,6 +175,9 @@ class TestCalDAVStorage(DAVStorageTests):
         def fake_init_and_remaining_args(**kwargs):
             kwargs = dict(kwargs)
             kwargs.pop("connector", None)
+            kwargs.pop("url", None)
+            kwargs.pop("username", None)
+            kwargs.pop("password", None)
             return FakeSession(), kwargs
 
         monkeypatch.setattr(CalDiscover, "discover", empty_discover)
@@ -226,6 +229,9 @@ class TestCalDAVStorage(DAVStorageTests):
         def fake_init_and_remaining_args(**kwargs):
             kwargs = dict(kwargs)
             kwargs.pop("connector", None)
+            kwargs.pop("url", None)
+            kwargs.pop("username", None)
+            kwargs.pop("password", None)
             return FakeSession(), kwargs
 
         monkeypatch.setattr(CalDiscover, "discover", empty_discover)
@@ -250,6 +256,45 @@ class TestCalDAVStorage(DAVStorageTests):
         payload = kwargs["data"].decode("utf-8")
         assert '<C:comp name="VEVENT"/>' in payload
         assert '<C:comp name="VTODO"/>' in payload
+
+    @pytest.mark.asyncio
+    async def test_delete_collection(self, monkeypatch):
+        calls = []
+
+        class FakeSession:
+            def get_default_headers(self):
+                return {"Content-Type": "application/xml; charset=UTF-8"}
+
+            async def request(self, method, url, **kwargs):
+                calls.append((method, url, kwargs))
+                return SimpleNamespace(url=url)
+
+        def fake_init_and_remaining_args(**kwargs):
+            kwargs = dict(kwargs)
+            kwargs.pop("connector", None)
+            kwargs.pop("url", None)
+            kwargs.pop("username", None)
+            kwargs.pop("password", None)
+            return FakeSession(), kwargs
+
+        monkeypatch.setattr(
+            self.storage_class.session_class,
+            "init_and_remaining_args",
+            fake_init_and_remaining_args,
+        )
+
+        storage = self.storage_class(
+            url="https://dav.test/home/tasks",
+            username="user",
+            password="pass",
+            collection="tasks",
+            connector=None,
+        )
+        await storage.delete_collection()
+
+        ((method, url, _kwargs),) = calls
+        assert method == "DELETE"
+        assert url == ""
 
     @pytest.mark.skipif(dav_server == "icloud", reason="iCloud only accepts VEVENT")
     @pytest.mark.skipif(

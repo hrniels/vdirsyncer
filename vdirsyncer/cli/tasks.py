@@ -13,6 +13,7 @@ from .discover import collections_for_pair
 from .discover import storage_instance_from_config
 from .utils import JobFailed
 from .utils import cli_logger
+from .utils import delete_status
 from .utils import get_status_name
 from .utils import handle_cli_error
 from .utils import load_status
@@ -58,6 +59,55 @@ async def create_collections(pair, status_path, *, collections=None, connector):
 
     for collection, _configs in rv:
         cli_logger.info(f"Created or verified {pair.name}/{collection}")
+
+
+async def delete_collections(pair, status_path, *, collections=None, connector):
+    rv = await collections_for_pair(
+        status_path=status_path,
+        pair=pair,
+        from_cache=False,
+        list_collections=False,
+        selected_collections=collections,
+        save_status_cache=False,
+        missing_strategy="skip",
+        connector=connector,
+    )
+    deleted_collections = set()
+
+    for collection, configs in rv:
+        status_name = get_status_name(pair.name, collection)
+
+        for config in configs:
+            if config is None:
+                continue
+
+            storage = await storage_instance_from_config(config, connector=connector)
+            await storage.delete_collection()
+
+        delete_status(status_path, pair.name, collection, "items")
+        delete_status(status_path, pair.name, collection, "metadata")
+        deleted_collections.add(collection)
+        cli_logger.info(f"Deleted {status_name}")
+
+    if deleted_collections:
+        collections_status = load_status(
+            status_path,
+            pair.name,
+            data_type="collections",
+        )
+        if collections_status:
+            cached_collections = collections_status.get("collections", [])
+            collections_status["collections"] = [
+                entry
+                for entry in cached_collections
+                if entry[0] not in deleted_collections
+            ]
+            save_status(
+                base_path=status_path,
+                pair=pair.name,
+                data_type="collections",
+                data=collections_status,
+            )
 
 
 async def sync_collection(

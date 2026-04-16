@@ -641,6 +641,9 @@ class DAVStorage(Storage):
 
         await self.session.request("DELETE", href, headers=headers)
 
+    async def delete_collection(self):
+        await self.session.request("DELETE", "", headers=self.session.get_default_headers())
+
     def _parse_prop_responses(self, root, handled_hrefs=None):
         if handled_hrefs is None:
             handled_hrefs = set()

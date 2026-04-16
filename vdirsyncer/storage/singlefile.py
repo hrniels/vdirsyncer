@@ -182,6 +182,12 @@ class SingleFileStorage(Storage):
 
         del self._items[href]
 
+    async def delete_collection(self):
+        if not os.path.isfile(self.path):
+            raise exceptions.CollectionNotFound(self.path)
+
+        os.remove(self.path)
+
     def _write(self):
         if self._last_etag is not None and self._last_etag != get_etag_from_file(
             self.path

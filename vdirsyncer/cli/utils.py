@@ -252,6 +252,12 @@ def save_status(
     os.chmod(path, STATUS_PERMISSIONS)
 
 
+def delete_status(base_path: str, pair: str, collection: str | None, data_type: str) -> None:
+    path = get_status_path(base_path, pair, collection, data_type)
+    with contextlib.suppress(OSError):
+        os.remove(path)
+
+
 def storage_class_from_config(config):
     config = dict(config)
     storage_name = config.pop("type")

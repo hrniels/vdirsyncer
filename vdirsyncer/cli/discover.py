@@ -48,6 +48,7 @@ async def collections_for_pair(
     force_create=False,
     selected_collections=None,
     save_status_cache=True,
+    missing_strategy="error",
     *,
     connector: aiohttp.TCPConnector,
 ):
@@ -117,6 +118,7 @@ async def collections_for_pair(
             get_b_discovered=b_discovered.get_self,
             _handle_collection_not_found=_handle_collection_not_found,
             selected_collections=selected_collections,
+            missing_strategy=missing_strategy,
         )
     )
 
@@ -141,8 +143,10 @@ async def _sanity_check_collections(collections, *, connector):
     tasks = []
 
     for _, (a_args, b_args) in collections:
-        tasks.append(storage_instance_from_config(a_args, connector=connector))
-        tasks.append(storage_instance_from_config(b_args, connector=connector))
+        if a_args is not None:
+            tasks.append(storage_instance_from_config(a_args, connector=connector))
+        if b_args is not None:
+            tasks.append(storage_instance_from_config(b_args, connector=connector))
 
     await asyncio.gather(*tasks)
 
@@ -216,6 +220,7 @@ async def expand_collections(
     get_b_discovered,
     _handle_collection_not_found,
     selected_collections=None,
+    missing_strategy="error",
 ):
     handled_collections = set()
     selected_collections = (
@@ -254,19 +259,25 @@ async def expand_collections(
                 collection_a,
                 config_a,
                 _handle_collection_not_found,
+                missing_strategy=missing_strategy,
             )
             b_args = await _collection_from_discovered(
                 get_b_discovered,
                 collection_b,
                 config_b,
                 _handle_collection_not_found,
+                missing_strategy=missing_strategy,
             )
 
             yield collection, (a_args, b_args)
 
 
 async def _collection_from_discovered(
-    get_discovered, collection, config, _handle_collection_not_found
+    get_discovered,
+    collection,
+    config,
+    _handle_collection_not_found,
+    missing_strategy="error",
 ):
     if collection is None:
         args = dict(config)
@@ -276,6 +287,8 @@ async def _collection_from_discovered(
     try:
         return (await get_discovered())[collection]
     except KeyError:
+        if missing_strategy == "skip":
+            return None
         return await _handle_collection_not_found(config, collection)
 
 

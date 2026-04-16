@@ -4,6 +4,7 @@ import contextlib
 import errno
 import logging
 import os
+import shutil
 import subprocess
 
 from vdirsyncer import exceptions
@@ -171,6 +172,12 @@ class FilesystemStorage(Storage):
             self._run_pre_deletion_hook(fpath)
 
         os.remove(fpath)
+
+    async def delete_collection(self):
+        if not os.path.isdir(self.path):
+            raise exceptions.CollectionNotFound(self.path)
+
+        shutil.rmtree(self.path)
 
     def _run_post_hook(self, fpath):
         logger.info(f"Calling post_hook={self.post_hook} with argument={fpath}")

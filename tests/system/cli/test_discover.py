@@ -221,7 +221,89 @@ def test_create_command(tmpdir, runner):
     assert not tmpdir.join("bar").join("two").exists()
 
     result = runner.invoke(["create", "foobar/one"])
+
+
+def test_delete_command(tmpdir, runner):
+    runner.write_with_general(
+        dedent(
+            f"""
+    [pair foobar]
+    a = "foo"
+    b = "bar"
+    collections = ["one", "two"]
+
+    [storage foo]
+    type = "filesystem"
+    path = "{tmpdir!s}/foo/"
+    fileext = ".txt"
+
+    [storage bar]
+    type = "filesystem"
+    path = "{tmpdir!s}/bar/"
+    fileext = ".txt"
+    """
+        )
+    )
+
+    foo_one = tmpdir.join("foo").ensure("one", dir=True)
+    foo_two = tmpdir.join("foo").ensure("two", dir=True)
+    bar_one = tmpdir.join("bar").ensure("one", dir=True)
+    bar_two = tmpdir.join("bar").ensure("two", dir=True)
+    foo_one.join("a.txt").write("UID:a")
+    bar_one.join("a.txt").write("UID:a")
+    foo_two.join("b.txt").write("UID:b")
+    bar_two.join("b.txt").write("UID:b")
+
+    status = tmpdir.join("status")
+    status.ensure(dir=True)
+    status.join("foobar/one.items").ensure(file=True)
+    status.join("foobar/one.metadata").ensure(file=True)
+    status.join("foobar.collections").write(
+        '{"collections": [["one", [{}, {}]], ["two", [{}, {}]]], "cache_key": "abc"}'
+    )
+
+    result = runner.invoke(["delete", "foobar/one"])
     assert not result.exception, result.output
+
+    assert not foo_one.exists()
+    assert not bar_one.exists()
+    assert foo_two.exists()
+    assert bar_two.exists()
+    assert not status.join("foobar/one.items").exists()
+    assert not status.join("foobar/one.metadata").exists()
+    assert '"one"' not in status.join("foobar.collections").read()
+    assert '"two"' in status.join("foobar.collections").read()
+
+
+def test_delete_command_skips_missing_side(tmpdir, runner):
+    runner.write_with_general(
+        dedent(
+            f"""
+    [pair foobar]
+    a = "foo"
+    b = "bar"
+    collections = ["one"]
+
+    [storage foo]
+    type = "filesystem"
+    path = "{tmpdir!s}/foo/"
+    fileext = ".txt"
+
+    [storage bar]
+    type = "filesystem"
+    path = "{tmpdir!s}/bar/"
+    fileext = ".txt"
+    """
+        )
+    )
+
+    foo_one = tmpdir.join("foo").ensure("one", dir=True)
+    foo_one.join("a.txt").write("UID:a")
+
+    result = runner.invoke(["delete", "foobar/one"])
+    assert not result.exception, result.output
+
+    assert not foo_one.exists()
 
 
 @pytest.mark.parametrize(
