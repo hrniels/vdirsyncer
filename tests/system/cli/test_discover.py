@@ -190,6 +190,40 @@ def test_null_collection_with_named_collection(tmpdir, runner):
     assert "HAHA" in bar.read()
 
 
+def test_create_command(tmpdir, runner):
+    runner.write_with_general(
+        dedent(
+            f"""
+    [pair foobar]
+    a = "foo"
+    b = "bar"
+    collections = ["one", "two"]
+
+    [storage foo]
+    type = "filesystem"
+    path = "{tmpdir!s}/foo/"
+    fileext = ".txt"
+
+    [storage bar]
+    type = "filesystem"
+    path = "{tmpdir!s}/bar/"
+    fileext = ".txt"
+    """
+        )
+    )
+
+    result = runner.invoke(["create", "foobar/one"])
+    assert not result.exception, result.output
+
+    assert tmpdir.join("foo").join("one").exists()
+    assert tmpdir.join("bar").join("one").exists()
+    assert not tmpdir.join("foo").join("two").exists()
+    assert not tmpdir.join("bar").join("two").exists()
+
+    result = runner.invoke(["create", "foobar/one"])
+    assert not result.exception, result.output
+
+
 @pytest.mark.parametrize(
     ("a_requires", "b_requires"),
     [

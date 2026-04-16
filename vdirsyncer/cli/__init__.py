@@ -231,6 +231,31 @@ def discover(ctx, pairs, list):
 
 
 @app.command()
+@collections_arg
+@pass_context
+@catch_errors
+def create(ctx, collections):
+    """
+    Create missing collections for the given pairs.
+
+    See the `sync` command for collection selection syntax.
+    """
+    from .tasks import create_collections
+
+    async def main(collection_names):
+        async with aiohttp.TCPConnector(limit_per_host=16) as conn:
+            for pair_name, selected in collection_names:
+                await create_collections(
+                    pair=ctx.config.get_pair(pair_name),
+                    status_path=ctx.config.general["status_path"],
+                    collections=selected,
+                    connector=conn,
+                )
+
+    asyncio.run(main(collections))
+
+
+@app.command()
 @click.argument("collection")
 @click.option(
     "--repair-unsafe-uid/--no-repair-unsafe-uid",

@@ -45,6 +45,9 @@ async def collections_for_pair(
     pair,
     from_cache=True,
     list_collections=False,
+    force_create=False,
+    selected_collections=None,
+    save_status_cache=True,
     *,
     connector: aiohttp.TCPConnector,
 ):
@@ -97,7 +100,10 @@ async def collections_for_pair(
         config, collection, e=None, implicit_create=False
     ):
         return await handle_collection_not_found(
-            config, collection, e=e, implicit_create=pair.implicit == "create"
+            config,
+            collection,
+            e=e,
+            implicit_create=force_create or pair.implicit == "create",
         )
 
     # We have to use a list here because the special None/null value would get
@@ -110,22 +116,24 @@ async def collections_for_pair(
             get_a_discovered=a_discovered.get_self,
             get_b_discovered=b_discovered.get_self,
             _handle_collection_not_found=_handle_collection_not_found,
+            selected_collections=selected_collections,
         )
     )
 
     await _sanity_check_collections(rv, connector=connector)
 
-    save_status(
-        base_path=status_path,
-        pair=pair.name,
-        data_type="collections",
-        data={
-            "collections": list(
-                _compress_collections_cache(rv, pair.config_a, pair.config_b)
-            ),
-            "cache_key": cache_key,
-        },
-    )
+    if save_status_cache:
+        save_status(
+            base_path=status_path,
+            pair=pair.name,
+            data_type="collections",
+            data={
+                "collections": list(
+                    _compress_collections_cache(rv, pair.config_a, pair.config_b)
+                ),
+                "cache_key": cache_key,
+            },
+        )
     return rv
 
 
@@ -207,8 +215,12 @@ async def expand_collections(
     get_a_discovered,
     get_b_discovered,
     _handle_collection_not_found,
+    selected_collections=None,
 ):
     handled_collections = set()
+    selected_collections = (
+        None if not selected_collections else set(selected_collections)
+    )
 
     if shortcuts is None:
         shortcuts = [None]
@@ -226,6 +238,12 @@ async def expand_collections(
                 collection, collection_a, collection_b = collection
             else:
                 collection_a = collection_b = collection
+
+            if (
+                selected_collections is not None
+                and collection not in selected_collections
+            ):
+                continue
 
             if collection in handled_collections:
                 continue

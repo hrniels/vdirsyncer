@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import datetime
+from types import SimpleNamespace
 from textwrap import dedent
 
 import aiohttp
@@ -14,6 +15,7 @@ from tests import TASK_TEMPLATE
 from tests import VCARD_TEMPLATE
 from tests.storage import format_item
 from vdirsyncer import exceptions
+from vdirsyncer.storage.dav import CalDiscover
 from vdirsyncer.storage.dav import CalDAVStorage
 
 from . import DAVStorageTests
@@ -150,6 +152,104 @@ class TestCalDAVStorage(DAVStorageTests):
                 await aiostream.stream.list(s.list())
 
         assert len(m.requests) == 1
+
+    @pytest.mark.asyncio
+    async def test_create_collection_preserves_item_types(self, monkeypatch):
+        calls = []
+
+        class FakeSession:
+            def get_default_headers(self):
+                return {"Content-Type": "application/xml; charset=UTF-8"}
+
+            async def request(self, method, url, **kwargs):
+                calls.append((method, url, kwargs))
+                return SimpleNamespace(url=url)
+
+        async def empty_discover(self):
+            if False:
+                yield None
+
+        async def fake_find_home(self):
+            return "https://dav.test/home/"
+
+        def fake_init_and_remaining_args(**kwargs):
+            kwargs = dict(kwargs)
+            kwargs.pop("connector", None)
+            return FakeSession(), kwargs
+
+        monkeypatch.setattr(CalDiscover, "discover", empty_discover)
+        monkeypatch.setattr(CalDiscover, "find_home", fake_find_home)
+        monkeypatch.setattr(
+            self.storage_class.session_class,
+            "init_and_remaining_args",
+            fake_init_and_remaining_args,
+        )
+
+        created = await self.storage_class.create_collection(
+            url="https://dav.test/calendar/",
+            username="user",
+            password="pass",
+            collection="tasks",
+            item_types=["VTODO"],
+            connector=None,
+        )
+
+        assert created["collection"] == "tasks"
+        assert created["url"] == "https://dav.test/home/tasks"
+
+        ((method, url, kwargs),) = calls
+        assert method == "MKCALENDAR"
+        assert url == "https://dav.test/home/tasks"
+        payload = kwargs["data"].decode("utf-8")
+        assert '<C:comp name="VTODO"/>' in payload
+        assert '<C:comp name="VEVENT"/>' not in payload
+
+    @pytest.mark.asyncio
+    async def test_create_collection_default_components(self, monkeypatch):
+        calls = []
+
+        class FakeSession:
+            def get_default_headers(self):
+                return {"Content-Type": "application/xml; charset=UTF-8"}
+
+            async def request(self, method, url, **kwargs):
+                calls.append((method, url, kwargs))
+                return SimpleNamespace(url=url)
+
+        async def empty_discover(self):
+            if False:
+                yield None
+
+        async def fake_find_home(self):
+            return "https://dav.test/home/"
+
+        def fake_init_and_remaining_args(**kwargs):
+            kwargs = dict(kwargs)
+            kwargs.pop("connector", None)
+            return FakeSession(), kwargs
+
+        monkeypatch.setattr(CalDiscover, "discover", empty_discover)
+        monkeypatch.setattr(CalDiscover, "find_home", fake_find_home)
+        monkeypatch.setattr(
+            self.storage_class.session_class,
+            "init_and_remaining_args",
+            fake_init_and_remaining_args,
+        )
+
+        created = await self.storage_class.create_collection(
+            url="https://dav.test/calendar/",
+            username="user",
+            password="pass",
+            collection="calendar",
+            connector=None,
+        )
+
+        assert created["url"] == "https://dav.test/home/calendar"
+
+        ((_, _, kwargs),) = calls
+        payload = kwargs["data"].decode("utf-8")
+        assert '<C:comp name="VEVENT"/>' in payload
+        assert '<C:comp name="VTODO"/>' in payload
 
     @pytest.mark.skipif(dav_server == "icloud", reason="iCloud only accepts VEVENT")
     @pytest.mark.skipif(

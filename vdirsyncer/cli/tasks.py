@@ -44,6 +44,22 @@ async def prepare_pair(pair_name, collections, config, *, connector):
         yield collection, config.general
 
 
+async def create_collections(pair, status_path, *, collections=None, connector):
+    rv = await collections_for_pair(
+        status_path=status_path,
+        pair=pair,
+        from_cache=False,
+        list_collections=False,
+        force_create=True,
+        selected_collections=collections,
+        save_status_cache=False,
+        connector=connector,
+    )
+
+    for collection, _configs in rv:
+        cli_logger.info(f"Created or verified {pair.name}/{collection}")
+
+
 async def sync_collection(
     collection,
     general,
