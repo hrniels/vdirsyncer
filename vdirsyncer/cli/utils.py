@@ -361,6 +361,8 @@ async def handle_collection_not_found(
     if implicit_create or click.confirm("Should vdirsyncer attempt to create it?"):
         storage_type = config["type"]
         cls, config = storage_class_from_config(config)
+        if config.get("read_only", False):
+            raise exceptions.UserError("This storage is read-only.")
         config["collection"] = collection
         try:
             args = await cls.create_collection(**config)
