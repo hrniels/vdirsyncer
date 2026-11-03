@@ -48,7 +48,7 @@ class _StatusBase(metaclass=abc.ABCMeta):
             yield ident, (a.to_status(), b.to_status())
 
     @abc.abstractmethod
-    def transaction(self):
+    def transaction(self, *, preserve=False):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -185,11 +185,14 @@ class SqliteStatus(_StatusBase):
             return False
 
     @contextlib.contextmanager
-    def transaction(self):
+    def transaction(self, *, preserve=False):
+        """Stages changes under an exclusive lock, optionally retaining other items."""
         old_c = self._c
         try:
             with _exclusive_transaction(self._c) as new_c:
                 self._c = new_c
+                if preserve:
+                    self._c.execute("INSERT INTO new_status SELECT * FROM status")
                 yield
                 self._c.execute("DELETE FROM status")
                 self._c.execute("INSERT INTO status SELECT * FROM new_status")

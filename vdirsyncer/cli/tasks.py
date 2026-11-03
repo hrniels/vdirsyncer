@@ -163,6 +163,52 @@ async def discover_collections(pair, **kwargs):
     cli_logger.info(f"Saved for {pair.name}: collections = {json.dumps(collections)}")
 
 
+async def push_collection(collection, general, filenames, source_side, *, connector):
+    from vdirsyncer.storage.filesystem import FilesystemStorage
+    from vdirsyncer.sync.push import push
+
+    configs = {"a": collection.config_a, "b": collection.config_b}
+    if source_side is None:
+        candidates = [
+            side for side, config in configs.items() if config["type"] == "filesystem"
+        ]
+        if len(candidates) != 1:
+            raise exceptions.UserError(
+                "Select the filesystem source with --from a or --from b."
+            )
+        source_side = candidates[0]
+    source = await storage_instance_from_config(
+        configs[source_side], create=False, connector=connector
+    )
+    if not isinstance(source, FilesystemStorage):
+        raise exceptions.UserError("Push requires a filesystem source.")
+    other_side = "b" if source_side == "a" else "a"
+    destination = await storage_instance_from_config(
+        configs[other_side], create=False, connector=connector
+    )
+    status_name = get_status_name(collection.pair.name, collection.name)
+    failed = False
+
+    def error_callback(error):
+        nonlocal failed
+        failed = True
+        handle_cli_error(status_name, error)
+
+    with manage_sync_status(
+        general["status_path"], collection.pair.name, collection.name
+    ) as status:
+        await push(
+            source,
+            destination,
+            status,
+            filenames,
+            source_side=source_side,
+            error_callback=error_callback,
+        )
+    if failed:
+        raise JobFailed
+
+
 async def repair_collection(
     config,
     collection,

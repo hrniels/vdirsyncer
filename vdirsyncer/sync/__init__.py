@@ -237,6 +237,7 @@ class Update(Action):
             )
             meta = self.dest.status.get_new(self.ident)
             meta.etag = await self.dest.storage.update(meta.href, self.item, meta.etag)
+            meta.hash = self.item.hash
 
         self.dest.status.update_ident(self.ident, meta)
 

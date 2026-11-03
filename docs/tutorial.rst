@@ -138,6 +138,51 @@ elements to the array.
 
 See :ref:`pair_config` for the reference documentation.
 
+Pushing individual calendar files
+---------------------------------
+
+To upload a newly created or edited calendar resource immediately, without
+checking either storage for other changes, use::
+
+    vdirsyncer push my_calendars/work meeting.ics another-meeting.ics
+
+Run ``vdirsyncer discover`` first. Select exactly one collection, using its
+configured collection name, not its display name. For pairs with
+``collections = null``, specify just the pair name.
+
+Filenames are relative to the selected collection's filesystem directory,
+not the current working directory. Absolute paths, subdirectories and symlinks
+pointing outside the collection are rejected. Each file must contain a valid
+calendar resource with a single UID; a recurring series and its exceptions
+are uploaded together. Deletions are not supported by this command.
+
+The filesystem side is selected automatically when only one side is a
+filesystem storage. If both sides use filesystem storage, specify the source::
+
+    vdirsyncer push --from a my_calendars/work meeting.ics
+
+The command updates the same synchronization status as regular ``sync``,
+retaining all unselected records. Unchanged selected items are skipped. Neither
+storage is listed, and unrelated remote changes are not downloaded. New items
+can be pushed without an initial full sync, but edits to existing remote items
+require their previously synchronized href and ETag.
+
+Updates use the cached destination ETag. If the remote resource has changed or
+disappeared, push fails rather than overwriting or recreating it. New-item
+collisions also fail. Pair conflict-resolution settings do not force writes;
+use regular ``sync`` to reconcile conflicts. Read-only destinations, changed
+UIDs and updates without a usable remote ETag are rejected. If a server
+transforms a resource and omits its new ETag, run regular ``sync`` before
+pushing another edit to that resource.
+
+Each successful item is committed separately. If any item fails, other files
+are still attempted and the command exits unsuccessfully. Like a normal sync,
+a push holds the calendar's status lock while writing; a concurrent operation
+may wait or fail with a database-lock error. A lost connection or crash after
+the server accepted a write can leave the outcome uncertain: run regular
+``sync`` to reconcile before retrying. Continue running regular ``sync`` to
+receive remote changes.
+
 .. _metasync_tutorial:
 
 Metadata synchronization

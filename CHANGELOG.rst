@@ -9,6 +9,15 @@ Package maintainers and users who have to manually update their installation
 may want to subscribe to `GitHub's tag feed
 <https://github.com/pimutils/vdirsyncer/tags.atom>`_.
 
+Unreleased
+==========
+
+- Add ``vdirsyncer push pair/calendar file.ics ...`` to upload selected local
+  calendar resources without scanning either storage. Conditional updates use
+  cached ETags and preserve synchronization status for subsequent full syncs.
+- Refresh the tracked content hash after updating an item during regular sync,
+  so later pushes do not mistake server-normalized data for a local edit.
+
 Version 0.21.0
 ==============
 

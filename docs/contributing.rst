@@ -98,6 +98,11 @@ The ``Makefile`` has a lot of options that allow you to control which tests are
 run, and which servers are tested. Take a look at its code where they are all
 initialized and documented.
 
+The push CLI tests also support an optional in-process Radicale server,
+without Docker. Install ``radicale`` in the test environment and run::
+
+    pytest tests/system/cli/test_push.py
+
 To tests against a specific DAV server, use ``DAV_SERVER``::
 
     make DAV_SERVER=xandikos test

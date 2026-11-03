@@ -94,6 +94,47 @@ collections_arg = click.argument(
 
 
 @app.command()
+@click.argument("collection")
+@click.argument("files", nargs=-1, required=True)
+@click.option(
+    "--from",
+    "source_side",
+    type=click.Choice(["a", "b"]),
+    help="Filesystem source side (required if both sides are filesystem storages).",
+)
+@pass_context
+@catch_errors
+def push(ctx, collection, files, source_side):
+    """Push selected ICS filenames from one collection without scanning for changes.
+
+    COLLECTION is pair/calendar, or a pair with collections = null. FILES are
+    filenames relative to that collection's filesystem storage, not the working
+    directory. Prior discovery is required. Conflicts fail without overwriting.
+    """
+    from vdirsyncer.exceptions import UserError
+
+    from .tasks import prepare_pair
+    from .tasks import push_collection
+
+    pair, separator, calendar = collection.partition("/")
+    if not pair or (separator and (not calendar or "/" in calendar)):
+        raise UserError("Specify exactly one pair/calendar.")
+    if not separator and ctx.config.get_pair(pair).collections is not None:
+        raise UserError("Specify exactly one pair/calendar.")
+
+    async def main():
+        async with aiohttp.TCPConnector(limit_per_host=16) as connector:
+            async for selected, general in prepare_pair(
+                pair, [calendar] if separator else None, ctx.config, connector=connector
+            ):
+                await push_collection(
+                    selected, general, files, source_side, connector=connector
+                )
+
+    asyncio.run(main())
+
+
+@app.command()
 @collections_arg
 @click.option(
     "--force-delete/--no-force-delete",
